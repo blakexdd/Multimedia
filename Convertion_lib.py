@@ -1,7 +1,7 @@
 import numpy as np
 from skimage.io import imread, imsave, imshow
 from skimage import img_as_float, img_as_ubyte
-
+import tensorflow as tf
 # Decreasing brights resolutiong function
 # Arguments:
 #   - Colored image and wanted bits for color
@@ -65,23 +65,35 @@ def encode_rgb(img: np.array) -> np.array:
     img_copy[:, :, 1] = - img_f[:, :, 0] * 0.0999 - img_f[:, :, 1] * 0.3360 + img_f[:, :, 2] * 0.4360
     img_copy[:, :, 2] = img_f[:, :, 0] * 0.6150 - img_f[:, :, 1] * 0.5586 - img_f[:, :, 2] * 0.0563
 
-    # initializing amout of pixels we want to drop
-    k = round(img_copy[:, :, 0].size * 0.05)
+    # getting image width and height
+    img_height = img_copy[:, :, 0].shape[0]
+    img_weight = img_copy[:, :, 0].shape[1]
 
-    # sorting image
-    sorted_img = sorted(img_copy[:, :, 0].ravel())
+    # making pooling for u channel
+    # reshaping image to 1, img_height, img_weight, 1 size
+    # 1 stands for number of examples in batch, and 1 at last
+    # position for number of channels
+    img_input_u = tf.reshape(img_copy[:, :, 1], [1, img_height, img_weight, 1])
 
-    # getting min and max value
-    min_b = sorted_img[k + 1]
-    max_b = sorted_img[-(k + 1)]
+    # performing average pooling operation
+    img_pooled_u = tf.nn.avg_pool(img_input_u, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding='SAME')
 
-    # evaluating new correlated image
-    img_correlated_y = (img_copy[:, :, 0] - min_b) / (max_b - min_b)
+    # reshaping image to initial size
+    img_copy[:, :, 1] = tf.reshape(img_pooled_u, [img_height, img_weight])
 
-    # clipping values from 0 to 1
-    img_correlated_y = np.clip(img_correlated_y, 0, 1)
-    img_copy[:, :, 0] = img_correlated_y
+    # making pooling for y channel
+    # reshaping image to 1, img_height, img_weight, 1 size
+    # 1 stands for number of examples in batch, and 1 at last
+    # position for number of channels
+    img_input_y = tf.reshape(img_copy[:, :, 2], [1, img_height, img_weight, 1])
 
+    # performing average pooling operation
+    img_pooled_y = tf.nn.avg_pool(img_input_y, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding='SAME')
+
+    # reshaping image to initial size
+    img_copy[:, :, 2] = tf.reshape(img_pooled_y, [img_height, img_weight])
+
+    # conveting image colors to range 0..255
     img_copy = img_as_ubyte(img_copy)
 
     return img_copy
